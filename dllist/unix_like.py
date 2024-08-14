@@ -1,5 +1,5 @@
+import os
 import ctypes
-import warnings
 from ctypes.util import find_library
 from typing import List
 
@@ -27,22 +27,22 @@ class dl_phdr_info(ctypes.Structure):
 )
 def info_callback(info, _size, data):
     libraries = data.contents.value
-    try:
-        name = info.contents.dlpi_name.decode("utf-8")
-        libraries.append(name)
-    except:
-        warnings.warn(f"Could not decode library name {info.contents.dlpi_name}")
+    name = os.fsdecode(info.contents.dlpi_name)
+    libraries.append(name)
 
     return 0
 
 
+libc_path = find_library("c")
+if libc_path is None or not hasattr(
+    (libc := ctypes.CDLL(libc_path)), "dl_iterate_phdr"
+):
+    raise ImportError("dl_iterate_phdr not found")
+
+
 def _platform_specific_dllist() -> List[str]:
     libraries: List[str] = []
-    libc = ctypes.CDLL(find_library("c"))
     libc.dl_iterate_phdr(info_callback, ctypes.byref(ctypes.py_object(libraries)))
 
-    if libraries:
-        # remove the first entry, which is the executable itself
-        libraries.pop(0)
-
-    return libraries
+    # remove the first entry, which is the executable itself
+    return libraries[1:]

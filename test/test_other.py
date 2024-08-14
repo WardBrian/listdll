@@ -18,4 +18,4 @@ if (
 def test_dllist_basic() -> None:
     with pytest.warns(UserWarning):
         dlls = dllist()
-    assert len(dlls) == 0
+    assert dlls is None

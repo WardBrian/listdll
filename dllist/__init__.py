@@ -2,33 +2,29 @@
 
 import platform
 import warnings
-from typing import List
+from typing import List, Optional
 
-__version__ = "1.2.0"
+__version__ = "2.0.0"
 
 _system = platform.system().lower()
-if (
-    _system.startswith("linux")
-    or _system.startswith("freebsd")
-    or _system.startswith("openbsd")
-    or _system.startswith("sunos")
-    or _system.startswith("solaris")
-):
-    from .unix_like import _platform_specific_dllist
-elif _system.startswith("darwin"):
-    from .macos import _platform_specific_dllist
-elif _system.startswith("windows") or _system.startswith("microsoft"):
-    from .windows import _platform_specific_dllist
-else:
-
-    def _platform_specific_dllist() -> List[str]:
+try:
+    if _system.startswith("darwin"):
+        from .macos import _platform_specific_dllist
+    elif _system.startswith("windows") or _system.startswith("microsoft"):
+        from .windows import _platform_specific_dllist
+    else:
+        # just try the Unix-like implementation
+        from .unix_like import _platform_specific_dllist
+except ImportError:
+    # thrown by unix_like if dl_iterate_phdr is not found
+    def _platform_specific_dllist() -> Optional[List[str]]:
         warnings.warn(
             f"Unable to list loaded libraries for unsupported platform {_system}"
         )
-        return []
+        return None
 
 
-def dllist() -> List[str]:
+def dllist() -> Optional[List[str]]:
     """
     List the dynamic libraries loaded by the current process.
 
@@ -46,4 +42,4 @@ def dllist() -> List[str]:
         warnings.warn(
             f"Unable to list loaded libraries: {e}",
         )
-        return []
+        return None

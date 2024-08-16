@@ -35,9 +35,10 @@ def get_module_filename(hModule: wintypes.HMODULE) -> Optional[str]:
     if GetModuleFileNameW(hModule, name, len(name)):
         return name.value
     error = ctypes.get_last_error()
+    msg = ctypes.FormatError(error).strip()
     warnings.warn(
         f"Failed to get module file name for module {hModule}: "
-        f"GetModuleFileNameW failed with error code {error}",
+        f"GetModuleFileNameW failed with error code {error}: {msg}",
         stacklevel=2,
     )
     return None
@@ -52,10 +53,9 @@ def get_module_handles() -> List[wintypes.HMODULE]:
         if not EnumProcessModules(
             hProcess, modules, ctypes.sizeof(modules), ctypes.byref(cbNeeded)
         ):
-            error = ctypes.get_last_error()
-            raise RuntimeError(
-                f"EnumProcessModules failed with error code {error}"
-            )
+            err = ctypes.get_last_error()
+            msg = ctypes.FormatError(err).strip()
+            raise ctypes.WinError(err, f"EnumProcessModules failed: {msg}")
         n = cbNeeded.value // ctypes.sizeof(wintypes.HMODULE)
         if n <= len(modules):
             return modules[:n]
@@ -64,5 +64,6 @@ def get_module_handles() -> List[wintypes.HMODULE]:
 def _platform_specific_dllist() -> List[str]:
     # skip first entry, which is the executable itself
     modules = get_module_handles()[1:]
-    libraries = [name for h in modules if (name := get_module_filename(h)) is not None]
+    libraries = [name for h in modules
+                    if (name := get_module_filename(h)) is not None]
     return libraries

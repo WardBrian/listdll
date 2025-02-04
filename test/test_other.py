@@ -2,8 +2,6 @@ import platform
 
 import pytest
 
-from dllist import dllist
-
 system = platform.system()
 
 if (
@@ -16,6 +14,5 @@ if (
 
 
 def test_dllist_basic() -> None:
-    with pytest.warns(UserWarning):
-        dlls = dllist()
-    assert dlls is None
+    import dllist
+    assert not hasattr(dllist, "dllist")

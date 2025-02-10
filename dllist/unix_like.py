@@ -1,5 +1,5 @@
+import os
 import ctypes
-import warnings
 from ctypes.util import find_library
 from typing import List
 
@@ -10,7 +10,7 @@ from typing import List
 # https://docs.oracle.com/cd/E88353_01/html/E37843/dl-iterate-phdr-3c.html
 
 
-class dl_phdr_info(ctypes.Structure):
+class _dl_phdr_info(ctypes.Structure):
     _fields_ = [
         ("dlpi_addr", ctypes.c_void_p),
         ("dlpi_name", ctypes.c_char_p),
@@ -19,30 +19,35 @@ class dl_phdr_info(ctypes.Structure):
     ]
 
 
-@ctypes.CFUNCTYPE(
+_dl_phdr_callback = ctypes.CFUNCTYPE(
     ctypes.c_int,
-    ctypes.POINTER(dl_phdr_info),
+    ctypes.POINTER(_dl_phdr_info),
     ctypes.c_size_t,
     ctypes.POINTER(ctypes.py_object),
 )
-def info_callback(info, _size, data):
-    libraries = data.contents.value
-    try:
-        name = info.contents.dlpi_name.decode("utf-8")
-        libraries.append(name)
-    except:
-        warnings.warn(f"Could not decode library name {info.contents.dlpi_name}")
 
+
+@_dl_phdr_callback
+def _info_callback(info, _size, data):
+    libraries = data.contents.value
+    name = os.fsdecode(info.contents.dlpi_name)
+    libraries.append(name)
     return 0
+
+
+if not hasattr((libc := ctypes.CDLL(None)), "dl_iterate_phdr"):
+    raise ImportError("dl_iterate_phdr not found")
+
+_dl_iterate_phdr = libc["dl_iterate_phdr"]
+_dl_iterate_phdr.argtypes = [
+    _dl_phdr_callback,
+    ctypes.POINTER(ctypes.py_object),
+]
+_dl_iterate_phdr.restype = ctypes.c_int
 
 
 def _platform_specific_dllist() -> List[str]:
     libraries: List[str] = []
-    libc = ctypes.CDLL(find_library("c"))
-    libc.dl_iterate_phdr(info_callback, ctypes.byref(ctypes.py_object(libraries)))
-
-    if libraries:
-        # remove the first entry, which is the executable itself
-        libraries.pop(0)
+    _dl_iterate_phdr(_info_callback, ctypes.byref(ctypes.py_object(libraries)))
 
     return libraries
